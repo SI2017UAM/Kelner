@@ -3,8 +3,12 @@ from settings import *
 from tilemap import collide_hit_rect
 vec = pg.math.Vector2
 
+def vec2int(v):
+    return (int(v.x), int(v.y))
+
 def collide_with_walls(sprite, group, dir):
     if dir == 'x':
+        # spritecollide(sprite, group, dokill, collided = None) -> Sprite_list
         hits = pg.sprite.spritecollide(sprite, group, False, collide_hit_rect)
         if hits:
             if sprite.vel.x > 0:
@@ -30,6 +34,8 @@ class Player(pg.sprite.Sprite):
         self.game = game
         self.image = game.player_img
         self.rect = self.image.get_rect()
+        # prostokat dla wykrywania kolizji, rozmiar jest stały, niezależny od prostokąta z obrazu
+        # srodkiem tego prostokata jest polozenie srodka naszego zwyklego prostokata
         self.hit_rect = PLAYER_HIT_RECT
         self.hit_rect.center = self.rect.center
         self.vel = vec(0, 0)
@@ -39,6 +45,7 @@ class Player(pg.sprite.Sprite):
     def get_keys(self):
         self.rot_speed = 0
         self.vel = vec(0, 0)
+        # get_pressed czyli tak dlugo jak jest wcisniety
         keys = pg.key.get_pressed()
         if keys[pg.K_LEFT] or keys[pg.K_a]:
             self.rot_speed = PLAYER_ROT_SPEED
@@ -47,14 +54,18 @@ class Player(pg.sprite.Sprite):
         if keys[pg.K_UP] or keys[pg.K_w]:
             self.vel = vec(PLAYER_SPEED, 0).rotate(-self.rot)
         if keys[pg.K_DOWN] or keys[pg.K_s]:
+            # cofamy się wolniej niż idziemy do przodu
             self.vel = vec(-PLAYER_SPEED / 2, 0).rotate(-self.rot)
 
     def update(self):
         self.get_keys()
         self.rot = (self.rot + self.rot_speed * self.game.dt) % 360
         self.image = pg.transform.rotate(self.game.player_img, self.rot)
+        # ustalamy wymiary prostokata
         self.rect = self.image.get_rect()
+        # ustalamy srodek (x,y) prostokata
         self.rect.center = self.pos
+        #self.game.dt - używamy dzięki czemu mamy frame-independent movement
         self.pos += self.vel * self.game.dt
         self.hit_rect.centerx = self.pos.x
         collide_with_walls(self, self.game.walls, 'x')
@@ -78,15 +89,28 @@ class Mob(pg.sprite.Sprite):
         self.rot = 0
 
     def update(self):
-        self.rot = (self.game.kitchen_pos - self.pos).angle_to(vec(1, 0))
+        mpos=vec(pg.mouse.get_pos())
+        mpos-=self.game.camera.camera.topleft
+        #self.rot = (self.game.kitchen_pos - self.pos).angle_to(vec(1, 0))
+
+        #calculates the angle to a given vector in degrees.
+        #angle_to(Vector2) -> float
+        #Returns the angle between self and the given vector.
+        if (self.game.start != self.game.goal):
+            self.rot = (self.game.path[vec2int(self.pos // TILESIZE)]).angle_to(vec(1, 0))
+        #print (self.rot)
         self.image = pg.transform.rotate(self.game.mob_img, self.rot)
         self.rect = self.image.get_rect()
         self.rect.center = self.pos
-        self.acc = vec(MOB_SPEED, 0).rotate(-self.rot)
-        self.acc += self.vel * -1
-        self.vel += self.acc * self.game.dt
-        self.pos += self.vel * self.game.dt + 0.5 * self.acc * self.game.dt ** 2
+        #self.acc = vec(MOB_SPEED, 0).rotate(-self.rot)
+        self.vel = vec(MOB_SPEED, 0).rotate(-self.rot)
+        self.pos += self.vel * self.game.dt
+        #self.acc += self.vel * -1
+        #self.vel += self.acc * self.game.dt
+        #self.pos += self.vel * self.game.dt + 0.5 * self.acc * self.game.dt ** 2
+
         self.hit_rect.centerx = self.pos.x
+        # wykrywanie kolizji
         collide_with_walls(self, self.game.walls, 'x')
         self.hit_rect.centery = self.pos.y
         collide_with_walls(self, self.game.walls, 'y')

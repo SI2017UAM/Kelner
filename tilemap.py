@@ -1,8 +1,9 @@
 import pygame as pg
 from settings import *
 
-
+# zwraca prosto
 def collide_hit_rect(one, two):
+    # zwraca true lub false (0/1)
     return one.hit_rect.colliderect(two.rect)
 
 class Map:
@@ -22,10 +23,13 @@ class Camera:
         self.camera = pg.Rect(0, 0, width, height)
         self.width = width
         self.height = height
-
+    # ustawiamy polozenie grafiki obiektu (tylko rect!!, czyli grafikę)
     def apply(self, entity):
+        #print (self.camera.topleft)
+        #self.camera.topleft to wektor (x,y)
         return entity.rect.move(self.camera.topleft)
 
+    # update parametrów kamry na podstawie celu (target)
     def update(self, target):
         x = -target.rect.centerx + int(WIDTH / 2)
         y = -target.rect.centery + int(HEIGHT / 2)
