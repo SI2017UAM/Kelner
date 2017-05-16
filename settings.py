@@ -43,6 +43,8 @@ MOB_HIT_RECT = pg.Rect(0, 0, 1, 1)
 #Wall settings
 WALL_IMG='block_05.png'
 #Kitchen settings
-KITCHEN_IMG='crate_24.png'
+KITCHEN_IMG='kitchen.png'
 #Table settings
-TABLE_IMG='crate_12.png'
+TABLE_IMG0='crate_12.png'
+TABLE_IMG1='crate_13.png'
+TABLE_IMG2='crate_14.png'

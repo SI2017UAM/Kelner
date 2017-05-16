@@ -1,4 +1,5 @@
 import pygame as pg
+import random
 from settings import *
 from tilemap import collide_hit_rect
 vec = pg.math.Vector2
@@ -72,7 +73,7 @@ class Player(pg.sprite.Sprite):
         self.hit_rect.centery = self.pos.y
         collide_with_walls(self, self.game.walls, 'y')
         self.rect.center = self.hit_rect.center
-
+        #print(pg.time.get_ticks()//1000)
 class Mob(pg.sprite.Sprite):
     def __init__(self, game, x, y):
         self.groups = game.all_sprites, game.mobs
@@ -115,6 +116,7 @@ class Mob(pg.sprite.Sprite):
         self.hit_rect.centery = self.pos.y
         collide_with_walls(self, self.game.walls, 'y')
         self.rect.center = self.hit_rect.center
+
 class Wall(pg.sprite.Sprite):
     def __init__(self, game, x, y):
         self.groups = game.all_sprites, game.walls
@@ -139,12 +141,17 @@ class Kitchen(pg.sprite.Sprite):
         self.rect.y = y * TILESIZE
 class Table(pg.sprite.Sprite):
     def __init__(self, game, x, y):
+        img_num=random.randint(0,2)
         self.groups = game.all_sprites, game.walls
         pg.sprite.Sprite.__init__(self, self.groups)
         self.game = game
-        self.image = game.table_img
+        self.image = game.table_img[img_num]
         self.rect = self.image.get_rect()
         self.x = x
         self.y = y
         self.rect.x = x * TILESIZE
         self.rect.y = y * TILESIZE
+        #self.rect.centerx-=TILESIZE/2
+        #self.rect.centery-=TILESIZE/2
+        #self.rect.width=40
+        #self.rect.height=40

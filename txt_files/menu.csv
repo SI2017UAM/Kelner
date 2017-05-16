@@ -1,0 +1,13 @@
+name;prepTimeMin;prepTimeMax;difficultyMin;difficultyMax;priceMin;priceMax
+kawa/herbata;3;5;1;5;5;10
+napoje;1;3;0;1;3;20
+piwo;1;3;0;1;5;20
+lody;2;10;1;5;3;20
+ciasto;1;2;0;5;8;20
+zupa;10;15;3;7;4;10
+zapiekanka;8;12;2;5;5;12
+pizza;25;40;3;10;15;50
+spaghetti;20;30;3;10;10;20
+kebab;10;12;6;7;12;30
+frytki;20;30;3;5;5;10
+rollokebs;15;18;5;10;15;35

@@ -1,7 +1,10 @@
 import pygame as pg
+import random
 import sys
+import csv
 import heapq
 from os import path
+import numpy as np
 from settings import *
 from sprites import *
 from tilemap import *
@@ -17,6 +20,56 @@ class PriorityQueue:
         return heapq.heappop(self.nodes)[1]
     def empty(self):
         return len(self.nodes)==0
+class OrderRequest(pg.sprite.Sprite):
+    def __init__(self,game,x,y):
+        self.groups=game.order_agents
+        pg.sprite.Sprite.__init__(self, self.groups)
+        self.game=game
+        self.status=0
+        self.groups=self.game.order_agents
+        self.cords=vec(x,y)
+        self.order_list=[]
+        self.food_ammount=np.random.poisson(2,1)+1
+        if (self.food_ammount > 5):
+            self.food_ammount-=1
+        self.menu_orders=np.random.choice(self.game.menu_size,self.food_ammount,0)
+        self.create_order()
+        print(self.order_list)
+    def create_order(self):
+        for i in self.menu_orders:
+            foodname=self.game.menu[i][0]
+            preptime=np.random.randint(int(self.game.menu[i][1]),int(self.game.menu[i][2])+1)
+            difficulty=np.random.randint(int(self.game.menu[i][3]),int(self.game.menu[i][4])+1)
+            price=np.random.randint(int(self.game.menu[i][5]),int(self.game.menu[i][6])+1)
+            self.order_list.append([foodname,preptime,difficulty,price])
+    def update(self):
+        pass
+class ClientAgent(pg.sprite.Sprite):
+    def __init__(self,game):
+        self.groups=game.order_agents
+        pg.sprite.Sprite.__init__(self, self.groups)
+        self.game=game
+        self.spawn_timer=np.random.poisson(2,1)
+        self.timer_sec=pg.time.get_ticks()//1000
+        self.last_spawned=self.timer_sec
+        self.free_tables=self.game.tables_coord
+        self.order_agents={}
+    def update(self):
+        self.timer_sec=pg.time.get_ticks()//1000
+        #print(self.spawn_timer,self.timer_sec,self.last_spawned)
+        if (self.timer_sec-self.spawn_timer>self.last_spawned and len(self.free_tables)>1):
+            self.last_spawned=self.timer_sec
+            self.spawn_timer=np.random.poisson(2,1)
+            shuffled_tables=np.random.permutation(self.free_tables)
+            #print(self.free_tables)
+            self.free_tables=shuffled_tables
+            #print(self.free_tables)
+            new_coord=self.free_tables[-1]
+            self.order_agents[new_coord[0],new_coord[1]]=OrderRequest(self.game,new_coord[0],new_coord[1])
+            np.delete(self.free_tables,-1)
+
+
+
 class Game:
     # każdy obiekt musi miec funkcję _init__
     def __init__(self):
@@ -38,7 +91,17 @@ class Game:
     def load_data(self):
         game_folder = path.dirname("__file__")
         img_folder = path.join(game_folder, 'imgs')
-        self.map = Map(path.join(game_folder, 'map1.txt'))
+        txt_folder = path.join(game_folder, 'txt_files')
+        self.map = Map(path.join(txt_folder, 'map1.txt'))
+        #txt_file=open(path.join(txt_folder,"menu.txt"))
+        #self.menu=txt_file.read().split('\n')
+        self.menu=[]
+        with open(path.join(txt_folder,"menu.csv")) as menu_file:
+            reader = csv.reader(menu_file,delimiter=";")
+            print(next(reader))
+            for row in reader:
+                self.menu.append(row)
+        self.menu_size=len(self.menu)
         ## load(fileobj, namehint=””) -> Surface, load zwraca obiekt pygame Surface
         self.player_img = pg.image.load(path.join(img_folder, PLAYER_IMG)).convert_alpha()
         self.mob_img = pg.image.load(path.join(img_folder, MOB_IMG)).convert_alpha()
@@ -46,9 +109,14 @@ class Game:
         self.wall_img = pg.transform.scale(self.wall_img, (TILESIZE,TILESIZE))
         self.kitchen_img = pg.image.load(path.join(img_folder, KITCHEN_IMG)).convert_alpha()
         self.kitchen_img  = pg.transform.scale(self.kitchen_img, (TILESIZE,TILESIZE))
-        self.table_img = pg.image.load(path.join(img_folder, TABLE_IMG)).convert_alpha()
-        #pygame.transform.scale() :: (Surface, (width, height), DestSurface = None) -> Surface
-        self.table_img = pg.transform.scale(self.table_img, (TILESIZE,TILESIZE))
+        self.table_img = {}
+
+        self.table_img[0] = pg.image.load(path.join(img_folder, TABLE_IMG0)).convert_alpha()
+        self.table_img[0] = pg.transform.scale(self.table_img[0], (TILESIZE,TILESIZE))
+        self.table_img[1] = pg.image.load(path.join(img_folder, TABLE_IMG1)).convert_alpha()
+        self.table_img[1] = pg.transform.scale(self.table_img[1], (TILESIZE,TILESIZE))
+        self.table_img[2] = pg.image.load(path.join(img_folder, TABLE_IMG2)).convert_alpha()
+        self.table_img[2] = pg.transform.scale(self.table_img[2], (TILESIZE,TILESIZE))
         ##
         self.home_img = pg.image.load(path.join(img_folder, 'home1.png')).convert_alpha()
         self.home_img = pg.transform.scale(self.home_img, (TILESIZE, TILESIZE))
@@ -68,8 +136,10 @@ class Game:
         self.all_sprites = pg.sprite.Group()
         self.walls = pg.sprite.Group()
         self.mobs = pg.sprite.Group()
+        self.order_agents=pg.sprite.Group()
         # DO PRZECHOWYWANIA OBIEKTOW LEPIEJ UZYC MAPY/TABLICY HASHUJACEJ, (x,y,OBIEKT)
         self.walls_obj={}
+        self.tables_coord=[]
         # >enumerate(['a','b','c'])
         # [(0,'a'), (1,'b'), (2,'c')]
         for row, tiles in enumerate(self.map.data):
@@ -82,10 +152,12 @@ class Game:
                     self.mob=Mob(self, col, row)
                 if tile == 'k':
                     self.walls_obj[col,row]=('kitchen', Kitchen(self, col, row))
-                    self.kitchen_pos=vec(col,row)*TILESIZE
+                    self.kitchen_pos=vec(col,row)
                 if tile == 't':
+                    self.tables_coord.append([col,row])
                     self.walls_obj[col,row]=('table', Table(self, col, row))
         self.camera = Camera(self.map.width, self.map.height)
+        self.client_agent=ClientAgent(self)
         #self.find_neighbors(vec(0,0))
         #self.find_neighbors(vec(0,1))
         #self.find_neighbors(vec(1,1))
@@ -110,6 +182,7 @@ class Game:
     def update(self):
         # update portion of the game loop
         # updatujemy sprite'y z grupy all_sprites
+        self.order_agents.update()
         self.all_sprites.update()
         #updatujemy polozenie kamery na pozycję gracza
         #self.camera.update(self.player)
@@ -129,7 +202,7 @@ class Game:
     def draw(self):
         pg.display.set_caption("{:.2f}".format(self.clock.get_fps()))
         self.screen.fill(BGCOLOR)
-        self.draw_grid()
+        #self.draw_grid()
         for sprite in self.all_sprites:
             self.screen.blit(sprite.image, self.camera.apply(sprite))
         # pg.draw.rect(self.screen, WHITE, self.player.hit_rect, 2)
