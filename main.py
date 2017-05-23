@@ -2,7 +2,7 @@ import pygame as pg
 import random
 import sys
 import csv
-import heapq
+
 from os import path
 import numpy as np
 from settings import *
@@ -11,15 +11,7 @@ from tilemap import *
 from collections import deque
 vec = pg.math.Vector2
 
-class PriorityQueue:
-    def __init__(self):
-        self.nodes = []
-    def put(self, node, cost):
-        heapq.heappush(self.nodes, (cost,node))
-    def get(self):
-        return heapq.heappop(self.nodes)[1]
-    def empty(self):
-        return len(self.nodes)==0
+
 class OrderRequest(pg.sprite.Sprite):
     def __init__(self,game,x,y):
         self.groups=game.order_agents
@@ -34,7 +26,8 @@ class OrderRequest(pg.sprite.Sprite):
             self.food_ammount-=1
         self.menu_orders=np.random.choice(self.game.menu_size,self.food_ammount,0)
         self.create_order()
-        print(self.order_list)
+        self.game.walls_obj[x,y][1].image = self.game.table_img[1]
+        #print(self.order_list)
     def create_order(self):
         for i in self.menu_orders:
             foodname=self.game.menu[i][0]
@@ -42,14 +35,12 @@ class OrderRequest(pg.sprite.Sprite):
             difficulty=np.random.randint(int(self.game.menu[i][3]),int(self.game.menu[i][4])+1)
             price=np.random.randint(int(self.game.menu[i][5]),int(self.game.menu[i][6])+1)
             self.order_list.append([foodname,preptime,difficulty,price])
-    def update(self):
-        pass
 class ClientAgent(pg.sprite.Sprite):
     def __init__(self,game):
         self.groups=game.order_agents
         pg.sprite.Sprite.__init__(self, self.groups)
         self.game=game
-        self.spawn_timer=np.random.poisson(2,1)
+        self.spawn_timer=np.random.poisson(0,1)
         self.timer_sec=pg.time.get_ticks()//1000
         self.last_spawned=self.timer_sec
         self.free_tables=self.game.tables_coord
@@ -57,19 +48,24 @@ class ClientAgent(pg.sprite.Sprite):
     def update(self):
         self.timer_sec=pg.time.get_ticks()//1000
         #print(self.spawn_timer,self.timer_sec,self.last_spawned)
-        if (self.timer_sec-self.spawn_timer>self.last_spawned and len(self.free_tables)>1):
+        if (self.timer_sec-self.spawn_timer>self.last_spawned and len(self.free_tables)>0):
             self.last_spawned=self.timer_sec
-            self.spawn_timer=np.random.poisson(2,1)
+            self.spawn_timer=np.random.poisson(0,1)
+
             shuffled_tables=np.random.permutation(self.free_tables)
-            #print(self.free_tables)
+
             self.free_tables=shuffled_tables
             #print(self.free_tables)
             new_coord=self.free_tables[-1]
             self.order_agents[new_coord[0],new_coord[1]]=OrderRequest(self.game,new_coord[0],new_coord[1])
-            np.delete(self.free_tables,-1)
 
-
-
+            if (len(self.free_tables)>1):
+                self.free_tables=self.free_tables[:-1]
+            else:
+                self.free_tables=[]
+    def print_orders(self):
+        for key,value in self.order_agents.items():
+            print("cord->",key," order->",value.order_list)
 class Game:
     # każdy obiekt musi miec funkcję _init__
     def __init__(self):
@@ -85,14 +81,14 @@ class Game:
         self.connections = [vec(1,0),vec(-1,0),vec(0,1),vec(0,-1),vec(1,1),vec(-1,1),vec(-1,-1),vec(1,-1)]
         self.weights = {}
         self.start = vec(5,5)
-        self.goal = vec(20,20)
+        self.goal = vec(10,5)
         self.path = {}
 
     def load_data(self):
         game_folder = path.dirname("__file__")
         img_folder = path.join(game_folder, 'imgs')
         txt_folder = path.join(game_folder, 'txt_files')
-        self.map = Map(path.join(txt_folder, 'map1.txt'))
+        self.map = Map(path.join(txt_folder, 'map2.txt'))
         #txt_file=open(path.join(txt_folder,"menu.txt"))
         #self.menu=txt_file.read().split('\n')
         self.menu=[]
@@ -101,6 +97,7 @@ class Game:
             print(next(reader))
             for row in reader:
                 self.menu.append(row)
+            print(self.menu)
         self.menu_size=len(self.menu)
         ## load(fileobj, namehint=””) -> Surface, load zwraca obiekt pygame Surface
         self.player_img = pg.image.load(path.join(img_folder, PLAYER_IMG)).convert_alpha()
@@ -188,7 +185,7 @@ class Game:
         #self.camera.update(self.player)
         self.camera.update(self.mob)
         self.start = vec(self.mob.pos // TILESIZE)
-        self.startPOS = vec(self.mob.pos / TILESIZE)
+        #self.startPOS = vec(self.mob.pos / TILESIZE)
     # tworzy siatkę na ekranie
     def draw_grid(self):
         # line(Surface, color, start_pos, end_pos, width=1)
@@ -221,8 +218,8 @@ class Game:
                 current = current + self.path[vec2int(current)]
         self.start_center = (self.goal.x * TILESIZE + TILESIZE / 2, self.goal.y * TILESIZE + TILESIZE / 2)
         self.screen.blit(self.home_img, self.home_img.get_rect(center=self.start_center).move(self.camera.camera.topleft))
-        self.goal_center = (self.startPOS.x * TILESIZE + TILESIZE / 2, self.startPOS.y * TILESIZE + TILESIZE / 2)
-        self.screen.blit(self.cross_img, self.cross_img.get_rect(center=self.goal_center).move(self.camera.camera.topleft))
+        #self.goal_center = (self.startPOS.x * TILESIZE + TILESIZE / 2, self.startPOS.y * TILESIZE + TILESIZE / 2)
+        #self.screen.blit(self.cross_img, self.cross_img.get_rect(center=self.goal_center).move(self.camera.camera.topleft))
         pg.display.flip()
 
     def events(self):
@@ -235,6 +232,8 @@ class Game:
                 if event.key == pg.K_ESCAPE:
                     #równieżwyjście z gry
                     self.quit()
+                if event.key == pg.K_m:
+                    self.client_agent.print_orders()
             if event.type == pg.MOUSEBUTTONDOWN:
                 mpos=(vec(pg.mouse.get_pos()) - self.camera.camera.topleft) // TILESIZE
                 #mpos-=self.camera.camera.topleft
@@ -271,75 +270,9 @@ class Game:
         neighbors=filter(self.in_bounds, neighbors)
         neighbors=filter(self.passable, neighbors)
         return neighbors
-
 def vec2int(v):
     return (int(v.x), int(v.y))
 
-def bfs(graph, start, end):
-    frontier = deque()
-    frontier.append(start)
-    path = {}
-    path[vec2int(start)] = None
-    while len(frontier) > 0 :
-        current = frontier.popleft()
-        if current==end:
-            break
-        for next in graph.find_neighbors(current):
-            if vec2int(next) not in path:
-                frontier.append(next)
-                path[vec2int(next)]=current - next
-    return path
-def heuristic(node1,node2):
-    #manhattan distance
-    return ((abs(node1.x-node2.x)+ abs(node1.y-node2.y)))*10
-def dijkstra_search(graph, start, end):
-    frontier = PriorityQueue()
-    frontier.put(vec2int(start), 0)
-    path = {}
-    cost = {}
-    path[vec2int(start)] = None
-    cost[vec2int(start)] = 0
-
-    while not frontier.empty():
-        current = frontier.get()
-        #dzieki zakomentowaniu robimy path dla calej planszy, dzieki czemu
-        #mozemy rysowac strzalki gdziekolwiek chcemy, a nie tylko w miejscach ktore odwiedzilismy
-        #if current == end:
-        #    break
-        for next in graph.find_neighbors(vec(current)):
-            next = vec2int(next)
-            next_cost = cost[current] + graph.cost(current, next)
-            if next not in cost or next_cost < cost[next]:
-                cost[next] = next_cost
-                priority = heuristic(end, vec(next))
-                frontier.put(next, priority)
-                path[next] = vec(current) - vec(next)
-    return path
-
-def a_star_search(graph, start, end):
-    frontier = PriorityQueue()
-    frontier.put(vec2int(start), 0)
-    path = {}
-    cost = {}
-    path[vec2int(start)] = None
-    cost[vec2int(start)] = 0
-
-    while not frontier.empty():
-        current = frontier.get()
-        #dzieki zakomentowaniu robimy path dla calej planszy, dzieki czemu
-        #mozemy rysowac strzalki gdziekolwiek chcemy, a nie tylko w miejscach ktore odwiedzilismy
-        #if current == end:
-        #    break
-        for next in graph.find_neighbors(vec(current)):
-            next = vec2int(next)
-            next_cost = cost[current] + graph.cost(current, next)
-            if next not in cost or next_cost < cost[next]:
-                cost[next] = next_cost
-                priority = next_cost + heuristic(end, vec(next))
-                frontier.put(next, priority)
-                path[next] = vec(current) - vec(next)
-    #path[node] - > connections, path wskaqzuje na kierunek w ktorym mamy sie poruszac
-    return path
 
 # create the game object
 g = Game()
