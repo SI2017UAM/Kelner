@@ -33,13 +33,16 @@ PLAYER_IMG = 'hitman1_hold.png'
 #PLAYER_HIT_RECT = pg.Rect(0, 0, 60, 90)
 PLAYER_HIT_RECT = pg.Rect(0, 0, 38, 38)
 
-MOB_SPEED = 200.0
+MOB_SPEED = 500.0
 MOB_ROT_SPEED = 200.0
 SEEK_FORCE = 0.8
 MOB_IMG = 'manOld_hold.png'
 #PLAYER_HIT_RECT = pg.Rect(0, 0, 60, 90)
 MOB_HIT_RECT = pg.Rect(0, 0, 1, 1)
 
+KITCHEN_FOOD_PREPARING_SPEED=15
+FOOD_EATING_ADD=10
+FOOD_EATING_MEAN=10
 #Wall settings
 WALL_IMG='block_05.png'
 #Kitchen settings
@@ -48,3 +51,6 @@ KITCHEN_IMG='kitchen.png'
 TABLE_IMG0='crate_12.png'
 TABLE_IMG1='crate_13.png'
 TABLE_IMG2='crate_14.png'
+TABLE_IMG3='crate_25.png'
+TABLE_IMG4='crate_15.png'
+TABLE_IMG5='crate_16.png'

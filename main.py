@@ -40,29 +40,37 @@ class ClientAgent(pg.sprite.Sprite):
         self.groups=game.order_agents
         pg.sprite.Sprite.__init__(self, self.groups)
         self.game=game
-        self.spawn_timer=np.random.poisson(0,1)
+        self.spawn_timer=np.random.poisson(1,1)
         self.timer_sec=pg.time.get_ticks()//1000
         self.last_spawned=self.timer_sec
+        self.ammount_of_taken_tables=0
         self.free_tables=self.game.tables_coord
         self.order_agents={}
+        self.bonus=0
+    def tableeFree(self):
+        self.last_spawned=pg.time.get_ticks()//1000
+        #jak duzo stolikow na raz staje sie znowu aktywnym mozemy sie tutaj zatkac, stad bonus
+        self.bonus+=1
     def update(self):
+        #print(pg.time.get_ticks()//1000)
         self.timer_sec=pg.time.get_ticks()//1000
         #print(self.spawn_timer,self.timer_sec,self.last_spawned)
-        if (self.timer_sec-self.spawn_timer>self.last_spawned and len(self.free_tables)>0):
+        if (len(self.free_tables)>0 and self.timer_sec-self.spawn_timer + self.bonus>self.last_spawned):
             self.last_spawned=self.timer_sec
-            self.spawn_timer=np.random.poisson(0,1)
-
+            self.spawn_timer=np.random.poisson(1,1)
+            self.bonus=0
             shuffled_tables=np.random.permutation(self.free_tables)
 
             self.free_tables=shuffled_tables
             #print(self.free_tables)
             new_coord=self.free_tables[-1]
             self.order_agents[new_coord[0],new_coord[1]]=OrderRequest(self.game,new_coord[0],new_coord[1])
-
+            self.ammount_of_taken_tables+=1
             if (len(self.free_tables)>1):
                 self.free_tables=self.free_tables[:-1]
             else:
                 self.free_tables=[]
+            print("from main ",new_coord,type(new_coord))
     def print_orders(self):
         for key,value in self.order_agents.items():
             print("cord->",key," order->",value.order_list)
@@ -83,7 +91,6 @@ class Game:
         self.start = vec(5,5)
         self.goal = vec(10,5)
         self.path = {}
-
     def load_data(self):
         game_folder = path.dirname("__file__")
         img_folder = path.join(game_folder, 'imgs')
@@ -114,6 +121,12 @@ class Game:
         self.table_img[1] = pg.transform.scale(self.table_img[1], (TILESIZE,TILESIZE))
         self.table_img[2] = pg.image.load(path.join(img_folder, TABLE_IMG2)).convert_alpha()
         self.table_img[2] = pg.transform.scale(self.table_img[2], (TILESIZE,TILESIZE))
+        self.table_img[3] = pg.image.load(path.join(img_folder, TABLE_IMG3)).convert_alpha()
+        self.table_img[3] = pg.transform.scale(self.table_img[3], (TILESIZE,TILESIZE))
+        self.table_img[4] = pg.image.load(path.join(img_folder, TABLE_IMG4)).convert_alpha()
+        self.table_img[4] = pg.transform.scale(self.table_img[4], (TILESIZE,TILESIZE))
+        self.table_img[5] = pg.image.load(path.join(img_folder, TABLE_IMG5)).convert_alpha()
+        self.table_img[5] = pg.transform.scale(self.table_img[5], (TILESIZE,TILESIZE))
         ##
         self.home_img = pg.image.load(path.join(img_folder, 'home1.png')).convert_alpha()
         self.home_img = pg.transform.scale(self.home_img, (TILESIZE, TILESIZE))
@@ -150,6 +163,7 @@ class Game:
                 if tile == 'k':
                     self.walls_obj[col,row]=('kitchen', Kitchen(self, col, row))
                     self.kitchen_pos=vec(col,row)
+                    self.kitchen=self.walls_obj[col,row][1]
                 if tile == 't':
                     self.tables_coord.append([col,row])
                     self.walls_obj[col,row]=('table', Table(self, col, row))
