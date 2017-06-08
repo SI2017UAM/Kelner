@@ -9,7 +9,8 @@ vec = pg.math.Vector2
 
 def vec2int(v):
     return (int(v.x), int(v.y))
-
+def intersect(s1,s2):
+    return(list(set(s1) & set(s2)))
 
 def bfs(graph, start, end):
     frontier = deque()
@@ -220,8 +221,8 @@ class Mob(pg.sprite.Sprite):
                             self.game.client_agent.free_tables=np.insert(self.game.client_agent.free_tables,[0],np.array(key),axis=0)
                         self.eating_timers.pop(key)
                         self.game.client_agent.tableeFree()
-                        print("from sprites",key,type(key),type([key[0],key[1]]),type(np.array(key)),type(self.game.client_agent.free_tables))
-                        print(self.game.client_agent.free_tables)
+                        #print("from sprites",key,type(key),type([key[0],key[1]]),type(np.array(key)),type(self.game.client_agent.free_tables))
+                        #print(self.game.client_agent.free_tables)
     def ManhattanDistance(self,item1,item2):
         return (abs(item1[0]-item2[0])+abs(item1[1]-item2[1]))
     def returnOptimizedOrders(self,mod):
@@ -268,13 +269,42 @@ class Mob(pg.sprite.Sprite):
         if (self.delay_mode!=1 and self.is_busy==1 and (abs(self.game.goal[0] - self.pos[0]//TILESIZE)+ abs(self.game.goal[1] - self.pos[1]//TILESIZE)<=1) and self.last_goal==self.game.goal):
             self.is_busy=0
             if (self.collecting_mode==0):
+                #kawa/herbata,napoje,piwo,lody,ciasto,zupa,zapiekanka,pizza,
+                #spaghetti,kebab,frytki,rollokebs,median_prep, median_difficulty, median_price, dodaj
                 #jeżeli czeka na podejscie kelnera i chce zlozyc zamowienie
                 if (self.orders[(self.game.goal[0], self.game.goal[1])]==1):
                     self.waiting_for_order-=1
                     # = 2 czyli czeka na przygotowanie danie
                     self.orders[(self.game.goal[0],self.game.goal[1])]=2
                     #ZMIENIAMY WYGLAD STOLIKA
-                    self.game.walls_obj[self.game.goal[0],self.game.goal[1]][1].image = self.game.table_img[2]
+                    rnd=np.random.randint(0,2)
+                    if rnd==1 and len(self.game.client_agent.order_agents[self.game.goal[0],self.game.goal[1]].order_list) <4:
+                        #print(self.game.client_agent.order_agents[self.game.goal[0],self.game.goal[1]].order_list, )
+                        fc=self.game.food_counter
+                        #print([fc["kawa/herbata"],fc["napoje"],fc["piwo"],fc["lody"],fc["ciasto"],fc["zupa"],fc["zapiekanka"],fc["pizza"],
+                        #fc["spaghetti"],fc["kebab"],fc["frytki"],fc["rollokebs"],np.median(self.game.totalPrep),np.median(self.game.totalDiff),np.median(self.game.totalCost)])
+                        rekomendacja=self.game.recommendation.predict([fc["kawa/herbata"],fc["napoje"],fc["piwo"],fc["lody"],fc["ciasto"],fc["zupa"],fc["zapiekanka"],fc["pizza"],
+                        fc["spaghetti"],fc["kebab"],fc["frytki"],fc["rollokebs"],np.median(self.game.totalPrep),np.median(self.game.totalDiff),np.median(self.game.totalCost)])
+                        D=['kebab','rollokebs','pizza','spaghetti','lody','zapiekanka']
+                        T=['piwo','napoje','kawa/herbata','frytki','ciasto','zupa']
+
+                        E=['kawa/herbata','napoje','piwo','zapiekanka','kebab','rollokebs']
+                        H=['pizza','frytki','spaghetti','zupa','lody','ciasto']
+
+                        if rekomendacja=="drogie/czasochlonne":
+                            nazwa=intersect(D,H)
+                        elif rekomendacja=="drogie/proste":
+                            nazwa=intersect(D,E)
+                        elif rekomendacja=="tanie/czasochlonne":
+                            nazwa=intersect(T,H)
+                        else:
+                            nazwa=intersect(T,E)
+                        tmp=np.random.randint(0,len(nazwa))
+                        print(rekomendacja,"=>",nazwa[tmp])
+                        self.game.client_agent.order_agents[self.game.goal[0],self.game.goal[1]].add_food_to_list(nazwa[tmp])
+                        self.game.walls_obj[self.game.goal[0],self.game.goal[1]][1].image = self.game.table_img[6]
+                    else:
+                        self.game.walls_obj[self.game.goal[0],self.game.goal[1]][1].image = self.game.table_img[2]
                     #DODAJEMY 1 do liczby oczekujacych na jedzonko
                     self.orders_to_kitchen+=1
             if (self.collecting_mode==2):
@@ -339,7 +369,8 @@ class Mob(pg.sprite.Sprite):
 
             #test odleglosci od kuchni
             test3=(abs(self.game.kitchen_pos[0] - self.pos[0]//TILESIZE)+ abs(self.game.kitchen_pos[1] - self.pos[1]//TILESIZE)<=5)
-
+            '''
+            WERSJA BEZ DRZEW DECYZYJNYCH
             if ((test and  (self.collecting_mode==0) or (self.waiting_for_delivery==0 and self.game.kitchen.orders_ready>0)) or (test3 and kuchenne and self.collecting_mode!=2) or self.nothintodo):
                 self.collecting_mode=1
             elif (self.waiting_for_delivery>0):
@@ -350,6 +381,14 @@ class Mob(pg.sprite.Sprite):
                 self.collecting_mode=1
             else:
                 self.collecting_mode=0
+            '''
+            #WERSJA Z DRZEWAMI
+            if (self.waiting_for_order>self.waiting_for_delivery and self.collecting_mode!=2):
+                self.collecting_mode=0
+            else:
+                X=np.array([self.waiting_for_order,self.orders_to_kitchen,self.waiting_for_delivery,int(self.collecting_mode==0),int(self.collecting_mode==1),int(self.collecting_mode==2)])
+                #print(X)
+                self.collecting_mode=self.game.sterowanie.get_predicted_value(X.reshape(1,-1))[0]-1
         # kiedy ma isc do kuchni odebrac zamowienia
 
     def update(self):
@@ -442,7 +481,9 @@ class Kitchen(pg.sprite.Sprite):
         return preptime
     # wez pierwsze lepsze zamowienie
     def pickOrder(self):
-        for i in self.orders.keys():
+        lista=list(self.orders.keys())
+        np.random.shuffle(lista)
+        for i in lista:
             # sprawdzamy czy zamowienie jest oczekujace
             if self.orders[i][0]==1:
                 #zmieniamy jego status na w trakcie realizacji

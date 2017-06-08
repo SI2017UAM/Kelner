@@ -5,6 +5,8 @@ import csv
 
 from os import path
 import numpy as np
+import rekomendacje as rek
+import sterowanie as ster
 from settings import *
 from sprites import *
 from tilemap import *
@@ -30,11 +32,31 @@ class OrderRequest(pg.sprite.Sprite):
         #print(self.order_list)
     def create_order(self):
         for i in self.menu_orders:
-            foodname=self.game.menu[i][0]
-            preptime=np.random.randint(int(self.game.menu[i][1]),int(self.game.menu[i][2])+1)
-            difficulty=np.random.randint(int(self.game.menu[i][3]),int(self.game.menu[i][4])+1)
-            price=np.random.randint(int(self.game.menu[i][5]),int(self.game.menu[i][6])+1)
+            rnd=np.random.randint(0,len(self.game.menu))
+            foodname=self.game.menu[rnd][0]
+            preptime=np.random.randint(int(self.game.menu[rnd][1]),int(self.game.menu[rnd][2])+1)
+            difficulty=np.random.randint(int(self.game.menu[rnd][3]),int(self.game.menu[rnd][4])+1)
+            price=np.random.randint(int(self.game.menu[rnd][5]),int(self.game.menu[rnd][6])+1)
             self.order_list.append([foodname,preptime,difficulty,price])
+            self.game.food_counter[foodname]+=1
+            self.game.totalCost.append(price)
+            self.game.totalDiff.append(difficulty)
+            self.game.totalPrep.append(preptime)
+    def add_food_to_list(self,foodname):
+        ct=0
+        for i in range(len(self.game.menu)):
+            if self.game.menu[i][0]==foodname:
+                ct=i
+        preptime=np.random.randint(int(self.game.menu[i][1]),int(self.game.menu[i][2])+1)
+        difficulty=np.random.randint(int(self.game.menu[i][3]),int(self.game.menu[i][4])+1)
+        price=np.random.randint(int(self.game.menu[i][5]),int(self.game.menu[i][6])+1)
+        self.order_list.append([foodname,preptime,difficulty,price])
+        self.game.food_counter[foodname]+=1
+        self.game.totalCost.append(price)
+        self.game.totalDiff.append(difficulty)
+        self.game.totalPrep.append(preptime)
+        #print([foodname,preptime,difficulty,price])
+        #print(self.game.food_counter,self.game.totalCost,self.game.totalDiff,self.game.totalPrep)
 class ClientAgent(pg.sprite.Sprite):
     def __init__(self,game):
         self.groups=game.order_agents
@@ -70,12 +92,11 @@ class ClientAgent(pg.sprite.Sprite):
                 self.free_tables=self.free_tables[:-1]
             else:
                 self.free_tables=[]
-            print("from main ",new_coord,type(new_coord))
+            #print("from main ",new_coord,type(new_coord))
     def print_orders(self):
         for key,value in self.order_agents.items():
             print("cord->",key," order->",value.order_list)
 class Game:
-    # każdy obiekt musi miec funkcję _init__
     def __init__(self):
         #inicjujemy pygame
         pg.init()
@@ -92,6 +113,7 @@ class Game:
         self.goal = vec(10,5)
         self.path = {}
     def load_data(self):
+
         game_folder = path.dirname("__file__")
         img_folder = path.join(game_folder, 'imgs')
         txt_folder = path.join(game_folder, 'txt_files')
@@ -104,7 +126,15 @@ class Game:
             print(next(reader))
             for row in reader:
                 self.menu.append(row)
-            print(self.menu)
+            #print(self.menu[0])
+        self.food_counter={}
+        self.totalPrep=[]
+        self.totalCost=[]
+        self.totalDiff=[]
+        for item in self.menu:
+            self.food_counter[item[0]]=0
+        #print(self.food_counter)
+
         self.menu_size=len(self.menu)
         ## load(fileobj, namehint=””) -> Surface, load zwraca obiekt pygame Surface
         self.player_img = pg.image.load(path.join(img_folder, PLAYER_IMG)).convert_alpha()
@@ -127,6 +157,8 @@ class Game:
         self.table_img[4] = pg.transform.scale(self.table_img[4], (TILESIZE,TILESIZE))
         self.table_img[5] = pg.image.load(path.join(img_folder, TABLE_IMG5)).convert_alpha()
         self.table_img[5] = pg.transform.scale(self.table_img[5], (TILESIZE,TILESIZE))
+        self.table_img[6] = pg.image.load(path.join(img_folder, TABLE_IMGX)).convert_alpha()
+        self.table_img[6] = pg.transform.scale(self.table_img[6], (TILESIZE,TILESIZE))
         ##
         self.home_img = pg.image.load(path.join(img_folder, 'home1.png')).convert_alpha()
         self.home_img = pg.transform.scale(self.home_img, (TILESIZE, TILESIZE))
@@ -287,9 +319,17 @@ class Game:
 def vec2int(v):
     return (int(v.x), int(v.y))
 
+reks=rek.NeuralRecomendation()
+reks.createEstimator()
+
+steruj=ster.Train()
+steruj.build_tree(steruj.header_list, steruj.data)
+
 
 # create the game object
 g = Game()
+g.recommendation=reks
+g.sterowanie=steruj
 g.show_start_screen()
 
 while True:
