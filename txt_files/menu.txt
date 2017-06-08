@@ -1,0 +1,12 @@
+kawa/herbata
+napoje
+piwo
+lody
+ciasto
+zupa
+zapiekanka
+pizza
+spaghetti
+kebab
+frytki
+rollokebs
